@@ -125,14 +125,15 @@ def rsa_encrypt_file(input_file: str, output_file: str, n: int, e: int) -> bool:
             C = mod_pow(byte, e, n)
             encrypted_data.append(C)
         
-        with open(output_file, 'wb') as f:
-            # Сохраняем зашифрованные данные
+        with open(output_file, 'w') as f:
+            # Сохраняем ключи и зашифрованные данные
+            f.write(f"# RSA Encrypted File\n")
+            f.write(f"# n={n}\n")
+            f.write(f"# e={e}\n")
+            f.write(f"# d={d}\n")
+            f.write("# Encrypted data:\n")
             for encrypted_value in encrypted_data:
-                if encrypted_value > 255:
-                    # Для больших чисел используем 4 байта
-                    f.write(encrypted_value.to_bytes(4, 'big'))
-                else:
-                    f.write(bytes([encrypted_value]))
+                f.write(f"{encrypted_value}\n")
         
         return True
     except Exception as e:
@@ -140,31 +141,36 @@ def rsa_encrypt_file(input_file: str, output_file: str, n: int, e: int) -> bool:
         return False
 
 
-def rsa_decrypt_file(input_file: str, output_file: str, n: int, d: int) -> bool:
+def rsa_decrypt_file(input_file: str, output_file: str) -> bool:
     """Расшифровка файла с помощью шифра RSA."""
     try:
-        with open(input_file, 'rb') as f:
-            data = f.read()
+        with open(input_file, 'r') as f:
+            lines = f.readlines()
+        
+        # Извлекаем ключи
+        n = None
+        d = None
+        
+        for line in lines:
+            line = line.strip()
+            if line.startswith('# n='):
+                n = int(line.split('=')[1])
+            elif line.startswith('# d='):
+                d = int(line.split('=')[1])
+        
+        if n is None or d is None:
+            print("Ошибка: не найдены ключи в файле")
+            return False
+        
+        # Читаем зашифрованные данные
+        encrypted_data = []
+        for line in lines:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                encrypted_data.append(int(line))
         
         decrypted_data = []
-        i = 0
-        while i < len(data):
-            # Читаем зашифрованный байт
-            if i + 4 <= len(data):
-                # Проверяем, является ли это 4-байтовым числом
-                encrypted_byte = int.from_bytes(data[i:i+4], 'big')
-                if encrypted_byte > 255:
-                    # Это 4-байтовое число
-                    i += 4
-                else:
-                    # Это обычный байт
-                    encrypted_byte = data[i]
-                    i += 1
-            else:
-                # Обычный байт
-                encrypted_byte = data[i]
-                i += 1
-            
+        for encrypted_byte in encrypted_data:
             # Расшифровываем
             # M = C^d mod n
             M = mod_pow(encrypted_byte, d, n)
@@ -283,7 +289,7 @@ if __name__ == '__main__':
             sys.exit(1)
         
         print(f"Расшифровка файла {args.input} -> {args.output}")
-        if rsa_decrypt_file(args.input, args.output, n, d):
+        if rsa_decrypt_file(args.input, args.output):
             print("Расшифровка завершена успешно")
         else:
             print("Ошибка при расшифровке")

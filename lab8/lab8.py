@@ -122,7 +122,7 @@ def compute_file_hash(file_path: str) -> bytes:
     return hash_obj.digest()
 
 
-def sign_file(input_file: str, signature_file: str, n: int, d: int) -> bool:
+def sign_file(input_file: str, signature_file: str, n: int, d: int, e: int) -> bool:
     """Подписание файла с помощью алгоритма RSA."""
     try:
         # Вычисляем хеш файла
@@ -153,19 +153,30 @@ def sign_file(input_file: str, signature_file: str, n: int, d: int) -> bool:
         return False
 
 
-def verify_signature(input_file: str, signature_file: str, n: int, e: int) -> bool:
+def verify_signature(input_file: str, signature_file: str) -> bool:
     """Проверка подписи файла."""
     try:
         # Читаем подпись
         with open(signature_file, 'r') as f:
             lines = f.readlines()
         
-        # Извлекаем подписи (пропускаем комментарии)
+        # Извлекаем ключи и подписи
+        n = None
+        e = None
         signatures = []
+        
         for line in lines:
             line = line.strip()
-            if line and not line.startswith('#'):
+            if line.startswith('# Modulus:'):
+                n = int(line.split(':')[1].strip())
+            elif line.startswith('# Public exponent:'):
+                e = int(line.split(':')[1].strip())
+            elif line and not line.startswith('#'):
                 signatures.append(int(line))
+        
+        if n is None or e is None:
+            print("Ошибка: не найдены ключи в файле подписи")
+            return False
         
         # Вычисляем хеш файла
         file_hash = compute_file_hash(input_file)
@@ -281,7 +292,7 @@ if __name__ == '__main__':
             sys.exit(1)
         
         print(f"Подписание файла {args.input}")
-        if sign_file(args.input, args.signature, n, d):
+        if sign_file(args.input, args.signature, n, d, e):
             print("Подписание завершено успешно")
         else:
             print("Ошибка при подписании")
@@ -297,7 +308,7 @@ if __name__ == '__main__':
             sys.exit(1)
         
         print(f"Проверка подписи файла {args.input}")
-        if verify_signature(args.input, args.signature, n, e):
+        if verify_signature(args.input, args.signature):
             print("Проверка завершена успешно")
         else:
             print("Ошибка при проверке подписи")

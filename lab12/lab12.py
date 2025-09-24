@@ -5,12 +5,25 @@
 Использует правила покера "Техасский холдем": каждому игроку раздается по 2 карты и выкладывается 5 карт на стол.
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
 import random
 import sys
 import argparse
+import platform
 from typing import List, Tuple, Dict, Optional
+
+# Проверка версии macOS для tkinter
+GUI_AVAILABLE = False
+try:
+    if platform.system() == "Darwin":  # macOS
+        # Для macOS используем только консольный режим
+        GUI_AVAILABLE = False
+    else:
+        # Для других ОС пробуем импортировать tkinter
+        import tkinter as tk
+        from tkinter import ttk, messagebox, scrolledtext
+        GUI_AVAILABLE = True
+except (ImportError, Exception):
+    GUI_AVAILABLE = False
 
 
 def mod_pow(a: int, e: int, m: int) -> int:
@@ -78,10 +91,6 @@ def gen_probable_prime(bits: int = 32, k: int = 8) -> int:
 
 class MentalPokerGame:
     def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("Ментальный покер - Техасский холдем")
-        self.root.geometry("800x600")
-        
         # Параметры игры
         self.num_players = 2
         self.num_cards = 52
@@ -95,10 +104,19 @@ class MentalPokerGame:
         self.decrypted_cards = []
         self.game_phase = "setup"  # setup, dealing, playing, finished
         
-        self.setup_ui()
+        if GUI_AVAILABLE:
+            self.root = tk.Tk()
+            self.root.title("Ментальный покер - Техасский холдем")
+            self.root.geometry("800x600")
+            self.setup_ui()
+        else:
+            self.root = None
     
     def setup_ui(self):
         """Настройка пользовательского интерфейса."""
+        if not GUI_AVAILABLE:
+            return
+            
         # Главный фрейм
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -140,20 +158,31 @@ class MentalPokerGame:
     
     def log(self, message: str):
         """Добавление сообщения в лог."""
-        self.log_text.insert(tk.END, message + "\n")
-        self.log_text.see(tk.END)
-        self.root.update()
+        if GUI_AVAILABLE and hasattr(self, 'log_text'):
+            self.log_text.insert(tk.END, message + "\n")
+            self.log_text.see(tk.END)
+            self.root.update()
+        else:
+            print(message)
     
     def clear_log(self):
         """Очистка лога."""
-        self.log_text.delete(1.0, tk.END)
+        if GUI_AVAILABLE and hasattr(self, 'log_text'):
+            self.log_text.delete(1.0, tk.END)
     
     def start_game(self):
         """Начало новой игры."""
         try:
-            self.num_players = int(self.players_var.get())
+            if GUI_AVAILABLE and hasattr(self, 'players_var'):
+                self.num_players = int(self.players_var.get())
+            else:
+                self.num_players = 2  # Значение по умолчанию для консольного режима
+                
             if self.num_players < 2 or self.num_players > 10:
-                messagebox.showerror("Ошибка", "Количество игроков должно быть от 2 до 10")
+                if GUI_AVAILABLE:
+                    messagebox.showerror("Ошибка", "Количество игроков должно быть от 2 до 10")
+                else:
+                    print("Ошибка: Количество игроков должно быть от 2 до 10")
                 return
             
             self.players = [f"Игрок {i+1}" for i in range(self.num_players)]
@@ -173,7 +202,10 @@ class MentalPokerGame:
             self.generate_keys()
             
         except ValueError:
-            messagebox.showerror("Ошибка", "Неверное количество игроков")
+            if GUI_AVAILABLE:
+                messagebox.showerror("Ошибка", "Неверное количество игроков")
+            else:
+                print("Ошибка: Неверное количество игроков")
     
     def generate_keys(self):
         """Генерация ключей для каждого игрока."""
@@ -209,7 +241,10 @@ class MentalPokerGame:
     def deal_cards(self):
         """Раздача карт."""
         if self.game_phase != "setup":
-            messagebox.showwarning("Предупреждение", "Игра уже начата")
+            if GUI_AVAILABLE:
+                messagebox.showwarning("Предупреждение", "Игра уже начата")
+            else:
+                print("Предупреждение: Игра уже начата")
             return
         
         self.log("=== РАЗДАЧА КАРТ ===")
@@ -263,7 +298,10 @@ class MentalPokerGame:
     def show_cards(self):
         """Показ карт после расшифровки."""
         if self.game_phase != "dealing":
-            messagebox.showwarning("Предупреждение", "Сначала раздайте карты")
+            if GUI_AVAILABLE:
+                messagebox.showwarning("Предупреждение", "Сначала раздайте карты")
+            else:
+                print("Предупреждение: Сначала раздайте карты")
             return
         
         self.log("=== РАСШИФРОВКА И ПОКАЗ КАРТ ===")
@@ -335,9 +373,46 @@ class MentalPokerGame:
     
     def run(self):
         """Запуск игры."""
+        if not GUI_AVAILABLE:
+            print("Графический интерфейс недоступен. Запуск в консольном режиме...")
+            self.console_mode()
+            return
+        
         self.log("Добро пожаловать в Ментальный покер!")
         self.log("Настройте количество игроков и нажмите 'Начать игру'")
         self.root.mainloop()
+    
+    def console_mode(self):
+        """Консольный режим работы."""
+        print("=== МЕНТАЛЬНЫЙ ПОКЕР - КОНСОЛЬНЫЙ РЕЖИМ ===")
+        
+        try:
+            num_players = int(input("Введите количество игроков (2-10): "))
+            if num_players < 2 or num_players > 10:
+                print("Количество игроков должно быть от 2 до 10")
+                return
+        except ValueError:
+            print("Неверный ввод")
+            return
+        
+        # Инициализируем игру
+        self.players = [f"Игрок {i+1}" for i in range(num_players)]
+        self.cards = list(range(1, self.num_cards + 1))  # Карты от 1 до 52
+        self.encrypted_cards = []
+        self.decrypted_cards = []
+        self.game_phase = "setup"
+        
+        # Генерируем ключи
+        print("\n=== ГЕНЕРАЦИЯ КЛЮЧЕЙ ===")
+        self.generate_keys()
+        
+        # Раздаем карты
+        print("\n=== РАЗДАЧА КАРТ ===")
+        self.deal_cards()
+        
+        # Показываем карты
+        print("\n=== ПОКАЗ КАРТ ===")
+        self.show_cards()
 
 
 def demonstrate_security():
@@ -374,7 +449,11 @@ if __name__ == '__main__':
         demonstrate_security()
     else:
         print('=== Лабораторная работа №12: Алгоритм "Ментальный покер" ===')
-        print('Запуск графического интерфейса...')
+        
+        if GUI_AVAILABLE:
+            print('Запуск графического интерфейса...')
+        else:
+            print('Графический интерфейс недоступен. Запуск в консольном режиме...')
         
         game = MentalPokerGame()
         game.run()

@@ -11,7 +11,6 @@ import argparse
 import os
 from typing import Tuple, Optional
 
-
 def mod_pow(a: int, e: int, m: int) -> int:
     """Возведение a^e по модулю m — алгоритм быстрого возведения (square-and-multiply)."""
     if m == 1:
@@ -122,17 +121,22 @@ def shamir_encrypt_file(input_file: str, output_file: str, p: int, C1: int, C2: 
             x1 = mod_pow(byte, C1, p)
             # Шаг 2: x2 = x1^C2 mod p
             x2 = mod_pow(x1, C2, p)
-            encrypted_data.append(x2)
+            # Шаг 3: x3 = x2^D1 mod p (где D1 = C1^(-1) mod (p-1))
+            x3 = mod_pow(x2, D1, p)
+            encrypted_data.extend([x1, x2, x3])
         
-        with open(output_file, 'wb') as f:
-            # Сохраняем зашифрованные данные как байты
-            for encrypted_byte in encrypted_data:
-                # Преобразуем в байт, учитывая что результат может быть больше 255
-                if encrypted_byte > 255:
-                    # Для больших чисел используем 4 байта
-                    f.write(encrypted_byte.to_bytes(4, 'big'))
-                else:
-                    f.write(bytes([encrypted_byte]))
+        with open(output_file, 'w') as f:
+            # Сохраняем ключи и зашифрованные данные
+            f.write(f"# Shamir Encrypted File\n")
+            f.write(f"# p={p}\n")
+            f.write(f"# C1={C1}\n")
+            f.write(f"# C2={C2}\n")
+            f.write(f"# D1={D1}\n")
+            f.write(f"# D2={D2}\n")
+            f.write("# Encrypted data (x1,x2,x3 triplets):\n")
+            for i in range(0, len(encrypted_data), 3):
+                if i + 2 < len(encrypted_data):
+                    f.write(f"{encrypted_data[i]},{encrypted_data[i+1]},{encrypted_data[i+2]}\n")
         
         return True
     except Exception as e:
@@ -140,37 +144,44 @@ def shamir_encrypt_file(input_file: str, output_file: str, p: int, C1: int, C2: 
         return False
 
 
-def shamir_decrypt_file(input_file: str, output_file: str, p: int, D1: int, D2: int) -> bool:
+def shamir_decrypt_file(input_file: str, output_file: str) -> bool:
     """Расшифровка файла с помощью шифра Шамира."""
     try:
-        with open(input_file, 'rb') as f:
-            data = f.read()
+        with open(input_file, 'r') as f:
+            lines = f.readlines()
+        
+        # Извлекаем ключи
+        p = None
+        D1 = None
+        D2 = None
+        
+        for line in lines:
+            line = line.strip()
+            if line.startswith('# p='):
+                p = int(line.split('=')[1])
+            elif line.startswith('# D1='):
+                D1 = int(line.split('=')[1])
+            elif line.startswith('# D2='):
+                D2 = int(line.split('=')[1])
+        
+        if p is None or D1 is None or D2 is None:
+            print("Ошибка: не найдены ключи в файле")
+            return False
+        
+        # Читаем зашифрованные данные
+        encrypted_triplets = []
+        for line in lines:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                x1, x2, x3 = map(int, line.split(','))
+                encrypted_triplets.append((x1, x2, x3))
         
         decrypted_data = []
-        i = 0
-        while i < len(data):
-            # Читаем зашифрованный байт
-            if i + 4 <= len(data):
-                # Проверяем, является ли это 4-байтовым числом
-                encrypted_byte = int.from_bytes(data[i:i+4], 'big')
-                if encrypted_byte > 255:
-                    # Это 4-байтовое число
-                    i += 4
-                else:
-                    # Это обычный байт
-                    encrypted_byte = data[i]
-                    i += 1
-            else:
-                # Обычный байт
-                encrypted_byte = data[i]
-                i += 1
-            
-            # Расшифровываем
-            # Шаг 1: y1 = x2^D2 mod p
-            y1 = mod_pow(encrypted_byte, D2, p)
-            # Шаг 2: M = y1^D1 mod p
-            M = mod_pow(y1, D1, p)
-            decrypted_data.append(M)
+        for x1, x2, x3 in encrypted_triplets:
+            # Расшифровываем байт
+            # Шаг 1: y1 = x3^D2 mod p (где D2 = C2^(-1) mod (p-1))
+            y1 = mod_pow(x3, D2, p)
+            decrypted_data.append(y1)
         
         with open(output_file, 'wb') as f:
             f.write(bytes(decrypted_data))
@@ -281,7 +292,7 @@ if __name__ == '__main__':
             sys.exit(1)
         
         print(f"Расшифровка файла {args.input} -> {args.output}")
-        if shamir_decrypt_file(args.input, args.output, p, D1, D2):
+        if shamir_decrypt_file(args.input, args.output):
             print("Расшифровка завершена успешно")
         else:
             print("Ошибка при расшифровке")

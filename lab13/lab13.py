@@ -6,14 +6,26 @@
 Поддерживает голосование с вариантами ответов: Да, Нет, Воздержался.
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
 import random
 import sys
 import argparse
-import threading
 import time
+import platform
 from typing import List, Tuple, Dict, Optional
+
+# Проверка версии macOS для tkinter
+GUI_AVAILABLE = False
+try:
+    if platform.system() == "Darwin":  # macOS
+        # Для macOS используем только консольный режим
+        GUI_AVAILABLE = False
+    else:
+        # Для других ОС пробуем импортировать tkinter
+        import tkinter as tk
+        from tkinter import ttk, messagebox, scrolledtext
+        GUI_AVAILABLE = True
+except (ImportError, Exception):
+    GUI_AVAILABLE = False
 
 
 def mod_pow(a: int, e: int, m: int) -> int:
@@ -239,10 +251,6 @@ class VotingSystemGUI:
     """Графический интерфейс системы анонимного голосования."""
     
     def __init__(self):
-        self.root = tk.Tk()
-        self.root.title("Система анонимного голосования со слепой подписью")
-        self.root.geometry("900x700")
-        
         # Инициализация сервера
         self.server = BlindSignatureServer()
         
@@ -250,10 +258,19 @@ class VotingSystemGUI:
         self.current_voter = None
         self.voters = []
         
-        self.setup_ui()
+        if GUI_AVAILABLE:
+            self.root = tk.Tk()
+            self.root.title("Система анонимного голосования со слепой подписью")
+            self.root.geometry("900x700")
+            self.setup_ui()
+        else:
+            self.root = None
     
     def setup_ui(self):
         """Настройка пользовательского интерфейса."""
+        if not GUI_AVAILABLE:
+            return
+            
         # Главный фрейм
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
@@ -317,24 +334,35 @@ class VotingSystemGUI:
     
     def log(self, message: str):
         """Добавление сообщения в лог."""
-        self.log_text.insert(tk.END, message + "\n")
-        self.log_text.see(tk.END)
-        self.root.update()
+        if GUI_AVAILABLE and hasattr(self, 'log_text'):
+            self.log_text.insert(tk.END, message + "\n")
+            self.log_text.see(tk.END)
+            self.root.update()
+        else:
+            print(message)
     
     def register_voter(self):
         """Регистрация голосующего."""
         voter_id = self.voter_id_var.get().strip()
         if not voter_id:
-            messagebox.showerror("Ошибка", "Введите ID голосующего")
+            if GUI_AVAILABLE:
+                messagebox.showerror("Ошибка", "Введите ID голосующего")
+            else:
+                print("Ошибка: Введите ID голосующего")
             return
         
         if self.server.register_voter(voter_id):
             self.voters.append(voter_id)
-            self.voter_combo['values'] = self.voters
+            if GUI_AVAILABLE and hasattr(self, 'voter_combo'):
+                self.voter_combo['values'] = self.voters
             self.log(f"Голосующий {voter_id} зарегистрирован")
-            self.voter_id_var.set("")
+            if GUI_AVAILABLE:
+                self.voter_id_var.set("")
         else:
-            messagebox.showerror("Ошибка", "Голосующий уже зарегистрирован")
+            if GUI_AVAILABLE:
+                messagebox.showerror("Ошибка", "Голосующий уже зарегистрирован")
+            else:
+                print("Ошибка: Голосующий уже зарегистрирован")
     
     def show_voters(self):
         """Показ зарегистрированных голосующих."""
@@ -346,15 +374,28 @@ class VotingSystemGUI:
     
     def vote(self):
         """Процесс голосования."""
-        voter_id = self.voter_combo.get()
-        choice = self.vote_var.get()
+        if GUI_AVAILABLE and hasattr(self, 'voter_combo'):
+            voter_id = self.voter_combo.get()
+            choice = self.vote_var.get()
+        else:
+            voter_id = input("Введите ID голосующего: ")
+            print("Варианты: 1-Да, 2-Нет, 3-Воздержался")
+            choice_map = {"1": "Да", "2": "Нет", "3": "Воздержался"}
+            vote_choice = input("Введите номер варианта: ")
+            choice = choice_map.get(vote_choice, "")
         
         if not voter_id:
-            messagebox.showerror("Ошибка", "Выберите голосующего")
+            if GUI_AVAILABLE:
+                messagebox.showerror("Ошибка", "Выберите голосующего")
+            else:
+                print("Ошибка: Выберите голосующего")
             return
         
         if not choice:
-            messagebox.showerror("Ошибка", "Выберите вариант ответа")
+            if GUI_AVAILABLE:
+                messagebox.showerror("Ошибка", "Выберите вариант ответа")
+            else:
+                print("Ошибка: Выберите вариант ответа")
             return
         
         self.log(f"=== ГОЛОСОВАНИЕ {voter_id} ===")
@@ -420,7 +461,86 @@ class VotingSystemGUI:
     
     def run(self):
         """Запуск системы."""
+        if not GUI_AVAILABLE:
+            print("Графический интерфейс недоступен. Запуск в консольном режиме...")
+            self.console_mode()
+            return
+        
         self.root.mainloop()
+    
+    def console_mode(self):
+        """Консольный режим работы."""
+        print("=== СИСТЕМА АНОНИМНОГО ГОЛОСОВАНИЯ - КОНСОЛЬНЫЙ РЕЖИМ ===")
+        
+        while True:
+            print("\nВыберите действие:")
+            print("1. Зарегистрировать голосующего")
+            print("2. Проголосовать")
+            print("3. Показать результаты")
+            print("4. Показать детали голосов")
+            print("5. Очистить результаты")
+            print("0. Выход")
+            
+            try:
+                choice = input("Введите номер действия: ").strip()
+                
+                if choice == "0":
+                    break
+                elif choice == "1":
+                    voter_id = input("Введите ID голосующего: ").strip()
+                    if self.server.register_voter(voter_id):
+                        self.voters.append(voter_id)
+                        print(f"Голосующий {voter_id} зарегистрирован")
+                    else:
+                        print("Ошибка: Голосующий уже зарегистрирован")
+                elif choice == "2":
+                    if not self.voters:
+                        print("Сначала зарегистрируйте голосующих")
+                        continue
+                    
+                    print("Зарегистрированные голосующие:", ", ".join(self.voters))
+                    voter_id = input("Выберите голосующего: ").strip()
+                    if voter_id not in self.voters:
+                        print("Голосующий не найден")
+                        continue
+                    
+                    print("Варианты ответов: 1-Да, 2-Нет, 3-Воздержался")
+                    vote_choice = input("Введите номер варианта: ").strip()
+                    choice_map = {"1": "Да", "2": "Нет", "3": "Воздержался"}
+                    
+                    if vote_choice not in choice_map:
+                        print("Неверный выбор")
+                        continue
+                    
+                    client = BlindSignatureClient(voter_id, self.server)
+                    if client.vote(choice_map[vote_choice]):
+                        print(f"Голос {voter_id} за {choice_map[vote_choice]} успешно подан")
+                    else:
+                        print("Ошибка при подаче голоса")
+                elif choice == "3":
+                    results = self.server.get_results()
+                    print("\n=== РЕЗУЛЬТАТЫ ГОЛОСОВАНИЯ ===")
+                    for vote, count in results.items():
+                        print(f"{vote}: {count} голосов")
+                elif choice == "4":
+                    details = self.server.get_vote_details()
+                    print("\n=== ДЕТАЛЬНАЯ ИНФОРМАЦИЯ О ГОЛОСАХ ===")
+                    for i, vote in enumerate(details):
+                        print(f"Голос {i+1}: {vote['voter_id']} -> {vote['vote']}")
+                elif choice == "5":
+                    self.server.votes.clear()
+                    self.server.vote_counts = {"Да": 0, "Нет": 0, "Воздержался": 0}
+                    for voter_id in self.server.voters:
+                        self.server.voters[voter_id]['voted'] = False
+                    print("Результаты голосования очищены")
+                else:
+                    print("Неверный выбор")
+                    
+            except KeyboardInterrupt:
+                print("\nВыход...")
+                break
+            except Exception as e:
+                print(f"Ошибка: {e}")
 
 
 def demonstrate_blind_signature():
@@ -475,7 +595,11 @@ if __name__ == '__main__':
         demonstrate_blind_signature()
     else:
         print('=== Лабораторная работа №13: Протокол "слепой" подписи для анонимного голосования ===')
-        print('Запуск графического интерфейса...')
+        
+        if GUI_AVAILABLE:
+            print('Запуск графического интерфейса...')
+        else:
+            print('Графический интерфейс недоступен. Запуск в консольном режиме...')
         
         voting_system = VotingSystemGUI()
         voting_system.run()

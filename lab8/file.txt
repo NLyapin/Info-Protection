@@ -1,0 +1,10 @@
+Содержимое этого файла предназначено для демонстрации процесса подписания и проверки подписи с помощью реализованного в lab8/lab8.py алгоритма.
+
+Вы можете использовать этот файл как пример для следующих действий:
+- Подписать файл с помощью режима sign
+- Проверить подпись с помощью режима verify
+
+Пример использования:
+    python lab8/lab8.py --mode sign --input lab8/file.txt --signature lab8/file.txt.sig
+    python lab8/lab8.py --mode verify --input lab8/file.txt --signature lab8/file.txt.sig
+

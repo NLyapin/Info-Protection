@@ -149,14 +149,17 @@ def elgamal_encrypt_file(input_file: str, output_file: str, p: int, g: int, D2: 
             
             encrypted_data.extend([r, e])
         
-        with open(output_file, 'wb') as f:
-            # Сохраняем зашифрованные данные
-            for encrypted_value in encrypted_data:
-                if encrypted_value > 255:
-                    # Для больших чисел используем 4 байта
-                    f.write(encrypted_value.to_bytes(4, 'big'))
-                else:
-                    f.write(bytes([encrypted_value]))
+        with open(output_file, 'w') as f:
+            # Сохраняем ключи и зашифрованные данные
+            f.write(f"# ElGamal Encrypted File\n")
+            f.write(f"# p={p}\n")
+            f.write(f"# g={g}\n")
+            f.write(f"# D2={D2}\n")
+            f.write(f"# C2={C2}\n")
+            f.write("# Encrypted data (r,e pairs):\n")
+            for i in range(0, len(encrypted_data), 2):
+                if i + 1 < len(encrypted_data):
+                    f.write(f"{encrypted_data[i]},{encrypted_data[i+1]}\n")
         
         return True
     except Exception as e:
@@ -164,48 +167,44 @@ def elgamal_encrypt_file(input_file: str, output_file: str, p: int, g: int, D2: 
         return False
 
 
-def elgamal_decrypt_file(input_file: str, output_file: str, p: int, C2: int) -> bool:
+def elgamal_decrypt_file(input_file: str, output_file: str) -> bool:
     """Расшифровка файла с помощью шифра Эль-Гамаля."""
     try:
-        with open(input_file, 'rb') as f:
-            data = f.read()
+        with open(input_file, 'r') as f:
+            lines = f.readlines()
+        
+        # Извлекаем ключи
+        p = None
+        C2 = None
+        
+        for line in lines:
+            line = line.strip()
+            if line.startswith('# p='):
+                p = int(line.split('=')[1])
+            elif line.startswith('# C2='):
+                C2 = int(line.split('=')[1])
+        
+        if p is None or C2 is None:
+            print("Ошибка: не найдены ключи в файле")
+            return False
+        
+        # Читаем зашифрованные данные
+        encrypted_pairs = []
+        for line in lines:
+            line = line.strip()
+            if line and not line.startswith('#'):
+                r, e = map(int, line.split(','))
+                encrypted_pairs.append((r, e))
         
         decrypted_data = []
-        i = 0
-        while i < len(data):
-            # Читаем пару (r, e)
-            if i + 4 <= len(data):
-                # Проверяем, является ли это 4-байтовым числом
-                r = int.from_bytes(data[i:i+4], 'big')
-                if r > 255:
-                    # Это 4-байтовое число
-                    i += 4
-                else:
-                    # Это обычный байт
-                    r = data[i]
-                    i += 1
-            else:
-                # Обычный байт
-                r = data[i]
-                i += 1
+        for r, e in encrypted_pairs:
+            # Расшифровываем байт
+            # M = e * (r^C2)^(-1) mod p
+            r_power = mod_pow(r, C2, p)
+            r_power_inv = mod_pow(r_power, p-2, p)  # Используем малую теорему Ферма
+            decrypted_byte = (e * r_power_inv) % p
             
-            # Читаем e
-            if i + 4 <= len(data):
-                e = int.from_bytes(data[i:i+4], 'big')
-                if e > 255:
-                    i += 4
-                else:
-                    e = data[i]
-                    i += 1
-            else:
-                e = data[i]
-                i += 1
-            
-            # Расшифровываем
-            # M = e * r^(-C2) mod p
-            r_inv = mod_pow(r, p - 1 - C2, p)
-            M = (e * r_inv) % p
-            decrypted_data.append(M)
+            decrypted_data.append(decrypted_byte)
         
         with open(output_file, 'wb') as f:
             f.write(bytes(decrypted_data))
@@ -309,7 +308,7 @@ if __name__ == '__main__':
             sys.exit(1)
         
         print(f"Расшифровка файла {args.input} -> {args.output}")
-        if elgamal_decrypt_file(args.input, args.output, p, C2):
+        if elgamal_decrypt_file(args.input, args.output):
             print("Расшифровка завершена успешно")
         else:
             print("Ошибка при расшифровке")
