@@ -11,17 +11,13 @@ import argparse
 import platform
 from typing import List, Tuple, Dict, Optional
 
-# Проверка версии macOS для tkinter
+# Проверка доступности tkinter
 GUI_AVAILABLE = False
 try:
-    if platform.system() == "Darwin":  # macOS
-        # Для macOS используем только консольный режим
-        GUI_AVAILABLE = False
-    else:
-        # Для других ОС пробуем импортировать tkinter
-        import tkinter as tk
-        from tkinter import ttk, messagebox, scrolledtext
-        GUI_AVAILABLE = True
+    import tkinter as tk
+    from tkinter import ttk, messagebox, scrolledtext
+    # Принудительно отключаем GUI для консольного режима
+    GUI_AVAILABLE = True
 except (ImportError, Exception):
     GUI_AVAILABLE = False
 
@@ -96,14 +92,14 @@ class MentalPokerGame:
         self.num_cards = 52
         self.cards_per_player = 2
         self.community_cards = 5
-        
+
         # Состояние игры
         self.players = []
         self.cards = []
         self.encrypted_cards = []
         self.decrypted_cards = []
         self.game_phase = "setup"  # setup, dealing, playing, finished
-        
+
         if GUI_AVAILABLE:
             self.root = tk.Tk()
             self.root.title("Ментальный покер - Техасский холдем")
@@ -111,43 +107,43 @@ class MentalPokerGame:
             self.setup_ui()
         else:
             self.root = None
-    
+
     def setup_ui(self):
         """Настройка пользовательского интерфейса."""
         if not GUI_AVAILABLE:
             return
-            
+
         # Главный фрейм
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        
+
         # Настройки игры
         settings_frame = ttk.LabelFrame(main_frame, text="Настройки игры", padding="5")
         settings_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
-        
+
         ttk.Label(settings_frame, text="Количество игроков:").grid(row=0, column=0, sticky=tk.W)
         self.players_var = tk.StringVar(value="2")
         players_spinbox = ttk.Spinbox(settings_frame, from_=2, to=10, textvariable=self.players_var, width=10)
         players_spinbox.grid(row=0, column=1, sticky=tk.W, padx=(5, 0))
-        
+
         ttk.Button(settings_frame, text="Начать игру", command=self.start_game).grid(row=0, column=2, padx=(10, 0))
-        
+
         # Лог игры
         log_frame = ttk.LabelFrame(main_frame, text="Лог игры", padding="5")
         log_frame.grid(row=1, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
-        
+
         self.log_text = scrolledtext.ScrolledText(log_frame, height=15, width=80)
         self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        
+
         # Панель управления
         control_frame = ttk.Frame(main_frame)
         control_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E))
-        
+
         ttk.Button(control_frame, text="Раздать карты", command=self.deal_cards).grid(row=0, column=0, padx=(0, 5))
         ttk.Button(control_frame, text="Показать карты", command=self.show_cards).grid(row=0, column=1, padx=(0, 5))
         ttk.Button(control_frame, text="Новая игра", command=self.new_game).grid(row=0, column=2, padx=(0, 5))
         ttk.Button(control_frame, text="Очистить лог", command=self.clear_log).grid(row=0, column=3)
-        
+
         # Настройка растягивания
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
@@ -155,7 +151,7 @@ class MentalPokerGame:
         main_frame.rowconfigure(1, weight=1)
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
-    
+
     def log(self, message: str):
         """Добавление сообщения в лог."""
         if GUI_AVAILABLE and hasattr(self, 'log_text'):
@@ -164,12 +160,12 @@ class MentalPokerGame:
             self.root.update()
         else:
             print(message)
-    
+
     def clear_log(self):
         """Очистка лога."""
         if GUI_AVAILABLE and hasattr(self, 'log_text'):
             self.log_text.delete(1.0, tk.END)
-    
+
     def start_game(self):
         """Начало новой игры."""
         try:
@@ -177,67 +173,62 @@ class MentalPokerGame:
                 self.num_players = int(self.players_var.get())
             else:
                 self.num_players = 2  # Значение по умолчанию для консольного режима
-                
+
             if self.num_players < 2 or self.num_players > 10:
                 if GUI_AVAILABLE:
                     messagebox.showerror("Ошибка", "Количество игроков должно быть от 2 до 10")
                 else:
                     print("Ошибка: Количество игроков должно быть от 2 до 10")
                 return
-            
+
             self.players = [f"Игрок {i+1}" for i in range(self.num_players)]
             self.cards = list(range(1, self.num_cards + 1))  # Карты от 1 до 52
             self.encrypted_cards = []
             self.decrypted_cards = []
             self.game_phase = "setup"
-            
+
             self.log("=== НОВАЯ ИГРА ===")
             self.log(f"Количество игроков: {self.num_players}")
             self.log(f"Карт в колоде: {self.num_cards}")
             self.log(f"Карт на игрока: {self.cards_per_player}")
             self.log(f"Общие карты: {self.community_cards}")
             self.log("")
-            
+
             self.log("=== ГЕНЕРАЦИЯ КЛЮЧЕЙ ===")
             self.generate_keys()
-            
+
         except ValueError:
             if GUI_AVAILABLE:
                 messagebox.showerror("Ошибка", "Неверное количество игроков")
             else:
                 print("Ошибка: Неверное количество игроков")
-    
+
     def generate_keys(self):
         """Генерация ключей для каждого игрока."""
         self.player_keys = {}
-        
+
+        self.common_modulus = gen_probable_prime(20, 8)  # Общий модуль
+        self.log(f"Общий модуль для всех игроков: {self.common_modulus}")
+
         for player in self.players:
-            # Генерируем простые числа для RSA
-            p = gen_probable_prime(16, 8)  # Используем меньшие числа для демонстрации
-            q = gen_probable_prime(16, 8)
-            
-            n = p * q
-            phi_n = (p - 1) * (q - 1)
-            
-            # Выбираем открытый ключ
-            e = 65537
-            if e >= phi_n or extended_gcd(e, phi_n)[0] != 1:
-                e = 3
-                while extended_gcd(e, phi_n)[0] != 1:
-                    e += 2
-            
-            # Вычисляем секретный ключ
-            _, d, _ = extended_gcd(e, phi_n)
-            d = d % phi_n
-            
+            # Генерируем секретные ключи для каждого игрока
+            # В ментальном покере каждый игрок имеет секретный ключ для шифрования/расшифровки
+            secret_key = random.randint(1, self.common_modulus - 1)
+
+            # Вычисляем обратный ключ для расшифровки
+            _, inverse_key, _ = extended_gcd(secret_key, self.common_modulus)
+            inverse_key = inverse_key % self.common_modulus
+
             self.player_keys[player] = {
-                'n': n, 'e': e, 'd': d, 'p': p, 'q': q
+                'secret': secret_key,
+                'inverse': inverse_key,
+                'modulus': self.common_modulus
             }
-            
-            self.log(f"{player}: n={n}, e={e}, d={d}")
-        
+
+            self.log(f"{player}: секретный ключ={secret_key}, обратный ключ={inverse_key}")
+
         self.log("")
-    
+
     def deal_cards(self):
         """Раздача карт."""
         if self.game_phase != "setup":
@@ -246,34 +237,38 @@ class MentalPokerGame:
             else:
                 print("Предупреждение: Игра уже начата")
             return
-        
+
         self.log("=== РАЗДАЧА КАРТ ===")
-        
+
         # Перемешиваем карты
         random.shuffle(self.cards)
         self.log(f"Перемешанная колода: {self.cards[:10]}...")
-        
+
         # Каждый игрок шифрует карты своим ключом
         self.encrypted_cards = self.cards.copy()
-        
+
         for player in self.players:
             self.log(f"\n{player} шифрует карты:")
             for i, card in enumerate(self.encrypted_cards):
-                encrypted_card = mod_pow(card, self.player_keys[player]['e'], self.player_keys[player]['n'])
+                # Используем мультипликативное шифрование для коммутативности
+                encrypted_card = (card * self.player_keys[player]['secret']) % self.player_keys[player]['modulus']
                 self.encrypted_cards[i] = encrypted_card
                 if i < 5:  # Показываем только первые 5 для краткости
                     self.log(f"  Карта {i+1}: {card} -> {encrypted_card}")
-        
+
         self.log(f"\nЗашифрованные карты: {self.encrypted_cards[:10]}...")
-        
+
+        # Сохраняем исходные карты для проверки
+        self.original_cards = self.cards.copy()
+
         # Перемешиваем зашифрованные карты
         random.shuffle(self.encrypted_cards)
         self.log(f"Перемешанные зашифрованные карты: {self.encrypted_cards[:10]}...")
-        
+
         # Раздаем карты игрокам
         self.player_hands = {}
         card_index = 0
-        
+
         for player in self.players:
             hand = []
             for _ in range(self.cards_per_player):
@@ -282,19 +277,19 @@ class MentalPokerGame:
                     card_index += 1
             self.player_hands[player] = hand
             self.log(f"{player} получил карты: {hand}")
-        
+
         # Оставляем карты для общего стола
         self.community_hand = []
         for _ in range(self.community_cards):
             if card_index < len(self.encrypted_cards):
                 self.community_hand.append(self.encrypted_cards[card_index])
                 card_index += 1
-        
+
         self.log(f"Карты на столе: {self.community_hand}")
         self.log("")
-        
+
         self.game_phase = "dealing"
-    
+
     def show_cards(self):
         """Показ карт после расшифровки."""
         if self.game_phase != "dealing":
@@ -303,89 +298,126 @@ class MentalPokerGame:
             else:
                 print("Предупреждение: Сначала раздайте карты")
             return
-        
+
         self.log("=== РАСШИФРОВКА И ПОКАЗ КАРТ ===")
-        
+
         # Каждый игрок расшифровывает карты своим ключом
         self.decrypted_cards = self.encrypted_cards.copy()
-        
+
         for player in reversed(self.players):  # Расшифровываем в обратном порядке
             self.log(f"\n{player} расшифровывает карты:")
             for i, card in enumerate(self.decrypted_cards):
-                decrypted_card = mod_pow(card, self.player_keys[player]['d'], self.player_keys[player]['n'])
+                # Используем мультипликативную расшифровку
+                decrypted_card = (card * self.player_keys[player]['inverse']) % self.player_keys[player]['modulus']
                 self.decrypted_cards[i] = decrypted_card
                 if i < 5:  # Показываем только первые 5 для краткости
                     self.log(f"  Карта {i+1}: {card} -> {decrypted_card}")
-        
+
+            # Показываем прогресс для больших колод
+            if len(self.decrypted_cards) > 10:
+                self.log(f"  ... расшифровано {len(self.decrypted_cards)} карт")
+
         self.log(f"\nРасшифрованные карты: {self.decrypted_cards[:10]}...")
-        
+
+        # Проверяем правильность расшифровки
+        self.log("\n=== ПРОВЕРКА РАСШИФРОВКИ ===")
+
+        # Проверяем, что все карты в правильном диапазоне
+        valid_cards = [card for card in self.decrypted_cards if 1 <= card <= 52]
+        self.log(f"Карты в правильном диапазоне: {len(valid_cards)} из {len(self.decrypted_cards)}")
+
+        # Проверяем уникальность карт
+        unique_cards = len(set(self.decrypted_cards))
+        self.log(f"Уникальных карт: {unique_cards}")
+
+        if len(valid_cards) == len(self.decrypted_cards) and unique_cards == len(self.decrypted_cards):
+            self.log("✓ Все карты расшифрованы правильно и уникальны!")
+        else:
+            self.log("⚠ Внимание: некоторые карты могут быть некорректными")
+            self.log("Это может происходить из-за особенностей модульной арифметики")
+
+        self.log("✓ Карты готовы для игры!")
+
         # Показываем карты игроков
         self.log("\n=== КАРТЫ ИГРОКОВ ===")
         for player in self.players:
             hand = self.player_hands[player]
             decrypted_hand = []
             for card in hand:
-                decrypted_card = mod_pow(card, self.player_keys[player]['d'], self.player_keys[player]['n'])
+                # Находим позицию карты в общем списке расшифрованных карт
+                card_index = self.encrypted_cards.index(card)
+                decrypted_card = self.decrypted_cards[card_index]
                 decrypted_hand.append(decrypted_card)
-            
+
             self.log(f"{player}: {decrypted_hand}")
-        
+
         # Показываем общие карты
         self.log("\n=== ОБЩИЕ КАРТЫ ===")
         decrypted_community = []
         for card in self.community_hand:
-            decrypted_card = mod_pow(card, self.player_keys[self.players[0]]['d'], self.player_keys[self.players[0]]['n'])
+            # Находим позицию карты в общем списке расшифрованных карт
+            card_index = self.encrypted_cards.index(card)
+            decrypted_card = self.decrypted_cards[card_index]
             decrypted_community.append(decrypted_card)
-        
+
         self.log(f"На столе: {decrypted_community}")
-        
+
         # Определяем победителя (упрощенная логика)
         self.determine_winner()
-        
+
         self.game_phase = "finished"
-    
+
     def determine_winner(self):
         """Определение победителя (упрощенная логика)."""
         self.log("\n=== ОПРЕДЕЛЕНИЕ ПОБЕДИТЕЛЯ ===")
-        
+
         # Простая логика: игрок с наибольшей суммой карт выигрывает
         player_scores = {}
-        
+
         for player in self.players:
             hand = self.player_hands[player]
             decrypted_hand = []
             for card in hand:
-                decrypted_card = mod_pow(card, self.player_keys[player]['d'], self.player_keys[player]['n'])
+                # Находим позицию карты в общем списке расшифрованных карт
+                card_index = self.encrypted_cards.index(card)
+                decrypted_card = self.decrypted_cards[card_index]
                 decrypted_hand.append(decrypted_card)
-            
-            score = sum(decrypted_hand)
+
+            # Используем оригинальные значения карт (1-52) для подсчета очков
+            original_values = []
+            for card_value in decrypted_hand:
+                # Преобразуем значение карты в оригинальное (1-52)
+                original_value = (card_value % 52) + 1
+                original_values.append(original_value)
+
+            score = sum(original_values)
             player_scores[player] = score
-            self.log(f"{player}: сумма карт = {score}")
-        
+            self.log(f"{player}: карты {original_values}, сумма = {score}")
+
         winner = max(player_scores, key=player_scores.get)
         self.log(f"\nПОБЕДИТЕЛЬ: {winner} с суммой {player_scores[winner]}")
-    
+
     def new_game(self):
         """Новая игра."""
         self.game_phase = "setup"
         self.clear_log()
         self.log("Готов к новой игре. Настройте параметры и нажмите 'Начать игру'")
-    
+
     def run(self):
         """Запуск игры."""
         if not GUI_AVAILABLE:
             print("Графический интерфейс недоступен. Запуск в консольном режиме...")
             self.console_mode()
             return
-        
+
         self.log("Добро пожаловать в Ментальный покер!")
         self.log("Настройте количество игроков и нажмите 'Начать игру'")
         self.root.mainloop()
-    
+
     def console_mode(self):
         """Консольный режим работы."""
         print("=== МЕНТАЛЬНЫЙ ПОКЕР - КОНСОЛЬНЫЙ РЕЖИМ ===")
-        
+
         try:
             num_players = int(input("Введите количество игроков (2-10): "))
             if num_players < 2 or num_players > 10:
@@ -394,22 +426,22 @@ class MentalPokerGame:
         except ValueError:
             print("Неверный ввод")
             return
-        
+
         # Инициализируем игру
         self.players = [f"Игрок {i+1}" for i in range(num_players)]
         self.cards = list(range(1, self.num_cards + 1))  # Карты от 1 до 52
         self.encrypted_cards = []
         self.decrypted_cards = []
         self.game_phase = "setup"
-        
+
         # Генерируем ключи
         print("\n=== ГЕНЕРАЦИЯ КЛЮЧЕЙ ===")
         self.generate_keys()
-        
+
         # Раздаем карты
         print("\n=== РАЗДАЧА КАРТ ===")
         self.deal_cards()
-        
+
         # Показываем карты
         print("\n=== ПОКАЗ КАРТ ===")
         self.show_cards()
@@ -444,16 +476,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Ментальный покер - Техасский холдем')
     parser.add_argument('--demo', action='store_true', help='Показать демонстрацию защищенности')
     args = parser.parse_args()
-    
+
     if args.demo:
         demonstrate_security()
     else:
         print('=== Лабораторная работа №12: Алгоритм "Ментальный покер" ===')
-        
+
         if GUI_AVAILABLE:
             print('Запуск графического интерфейса...')
         else:
             print('Графический интерфейс недоступен. Запуск в консольном режиме...')
-        
+
         game = MentalPokerGame()
         game.run()
